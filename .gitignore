@@ -1,1 +1,6 @@
-*.pyc
+*.py[cod]
+*.so
+*.egg
+*.egg-info
+
+lib/bot_token.py

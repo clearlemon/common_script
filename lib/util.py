@@ -40,14 +40,10 @@ class DateHour( object ):
         _datetime = self.datetime + datetime.timedelta(days=_days, seconds=_seconds)
 
         date = '%.4d%.2d%.2d' %(_datetime.year, _datetime.month, _datetime.day)
-        time = '%.2d%.2d' %(_datetime.hour, _datetime.minute)
-        return (date, time)
-
-def get_cur_date():
-
-    tmp_obj = DateHour()
-    cur_date, cur_time = tmp_obj.get_date_hour()
-    return cur_date
+        hour = '%.2d' %(_datetime.hour)
+        minute = '%.2d' %(_datetime.minute)
+        # time = '%.2d%.2d' %(_datetime.hour, _datetime.minute)
+        return (date, hour, minute)
 
 
 def readconffile(confpath, confilename):
@@ -104,7 +100,7 @@ def dict2json(dict, _encoding='utf-8'):
     try:
         text = json.dumps(dict, ensure_ascii=False)
         if _encoding:
-            text = text.encode(_encoding)
+            text = text.encode(_encoding, 'ignore')
     except Exception, e:
         print >> sys.stderr, 'in dict2json:', e
     return text
@@ -114,7 +110,6 @@ def json2dict(text, _encoding='utf-8'):
     try: dict = json.loads(text, encoding=_encoding)
     except Exception, e: print >> sys.stderr, 'in json2dict:', e
     return dict
-    return return_list
 
 def log_write(level, str):
     frame, file_name, line_no, function_name, unknown1, unknown2 = inspect.stack()[1]

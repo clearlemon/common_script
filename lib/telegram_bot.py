@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import os
 import sys
 import logging
 
@@ -50,8 +51,8 @@ def start(bot, update):
 
 @command(CommandHandler, 'p')
 def price(bot, update):
-    # req_huobi.main()
     bot.sendMessage(chat_id=update.message.chat_id, text="Yes i will give you usdt price.")
+    req_huobi.main()
 
 
 @command(MessageHandler, Filters.text)

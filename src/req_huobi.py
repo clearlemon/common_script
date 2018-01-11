@@ -3,6 +3,7 @@
 
 import os
 import sys
+import time
 import urllib
 import urllib2
 sys.path.append('../lib')
@@ -25,6 +26,7 @@ def req_page(req_url):
 
 
 def proc_page(data_dict):
+    ""
     usdt_buy_url = api_conf.usdt_api_dict['buy']
     page_json = req_page(usdt_buy_url)
 
@@ -34,7 +36,7 @@ def proc_page(data_dict):
         return
 
     ret_data_list = page_dict.get('data', {})
-    if not ret_data:
+    if not ret_data_list:
         return
 
     price_list = []
@@ -52,15 +54,28 @@ def proc_page(data_dict):
     return
 
 
-def proc_data(data_dict)
+def proc_data(data_dict):
+    ""
+    price_list = data_dict.get('price_list', [])
+    min_price = None
+    if len(price_list) > 0:
+        min_price = price_list[0]
+
+    if min_price:
+        msg = 'username\tprice\tmin_trade_limit\tmax_trade_limit' + '\n'
+        for person_price_list in price_list:
+            msg += '%s\t%s\t%s\t%s' %(person_price_list[0], person_price_list[1], person_price_list[2], person_price_list[3]) + '\n'
+        telegram_bot.bot.send_message(chat_id=telegram_bot.my_group_id, text=msg)
 
 
 
 def main():
     ""
-    data_dict = {}
-    proc_page(data_dict)
-    proc_data(data_dict)
+    while True:
+        data_dict = {}
+        proc_page(data_dict)
+        proc_data(data_dict)
+        time.sleep(1)
 
 
 if __name__ == '__main__':

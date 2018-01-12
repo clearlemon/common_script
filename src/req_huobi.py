@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import logging
 import os
 import sys
 import time
@@ -8,6 +9,7 @@ import urllib
 import urllib2
 sys.path.append('../lib')
 
+import log
 import util
 import api_conf
 import telegram_bot
@@ -100,12 +102,13 @@ def gen_time_seq(data_dict):
 
 def merge_history_price(data_dict):
     ""
-
     if not os.path.exists(history_data_path):
+        logging.info('%s not exists.' %(history_data_path))
         return SUCC
 
     ret = gen_time_seq(data_dict)
     if ret == FAIL:
+        logging.fatal('gen time seq fail.')
         return FAIL
 
     need_dates_set = data_dict['dates_set']
@@ -146,16 +149,12 @@ def write_data2local(data_dict):
 def proc_data(data_dict):
     ""
     price_list = data_dict.get('price_list', [])
-    min_price = None
-    if len(price_list) > 0:
-        min_price = price_list[0]
-
-    if min_price:
-        msg = 'username\tprice\tmin_trade_limit\tmax_trade_limit' + '\n'
-        telegram_bot.bot.send_message(chat_id=telegram_bot.my_group_id, text=msg)
+    min_price = data_dict.get('min_price', None)
+    if not price_list or not min_price:
+        return FAIL
 
 
-def init_data(data_dict):
+def init(data_dict):
     ""
     time_obj = util.DateHour()
     date, hour, minute = time_obj.get_date_hour()
@@ -169,19 +168,22 @@ def init_data(data_dict):
     if not os.path.exists('../data'):
         os.mkdir('../data')
 
+    log.init_log(log_path='../log/my_app', when='H')
     return
 
 
 def run():
     ""
     data_dict = {}
-    init_data(data_dict)
+    init(data_dict)
+    logging.info('Init succ.')
 
     ret = SUCC
     retry_cnt = 0
     while retry_cnt < 5:
         ret = get_page_price(data_dict)
         if ret == SUCC:
+            logging.info('get page price succ retry_cnt: %d.' %(retry_cnt))
             break
         retry_cnt += 1
         time.sleep(1)

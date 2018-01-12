@@ -4,3 +4,4 @@
 *.egg-info
 
 lib/bot_token.py
+log/

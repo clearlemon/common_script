@@ -16,18 +16,6 @@ from bot_token import *
 sys.path.append('../src')
 import req_huobi
 
-log_conf = {
-    'stream': sys.stderr,
-    'level': logging.INFO,
-    'format': "%(asctime)s %(levelname)s %(filename)s %(threadName)s %(message)s",
-    'datefmt': "%Y-%m-%d %H:%M:%S",
-}
-log_file = None
-if log_file:
-    log_conf["filename"] = log_file
-
-logging.basicConfig(**log_conf)
-
 
 bot = telegram.Bot(token=my_token)
 updater = Updater(token=my_token)

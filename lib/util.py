@@ -140,6 +140,5 @@ common_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit
 
 if __name__ == '__main__':
 
-    print 'this is util.py for common function wrote by huangyang04.'
     datehour = DateHour()
     print datehour.get_date_hour()

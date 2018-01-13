@@ -7,6 +7,7 @@ import sys
 import time
 import urllib
 import urllib2
+import matplotlib.pyplot as plt
 sys.path.append('../lib')
 
 import log
@@ -19,6 +20,7 @@ attr_name_list = [
     'price',
     'minTradeLimit',
     'maxTradeLimit',
+    'tradeCount',
 ]
 
 FAIL = -1
@@ -51,8 +53,8 @@ def get_page_price(data_dict):
     if not ret_data_list:
         return FAIL
 
-    price_list = []
-    min_price = 100000000000
+    min_price_buy_list = []
+    min_price_buy = 100000000000
     for (idx, user_dict) in enumerate(ret_data_list):
         obj_dict = {}
         for key in attr_name_list:
@@ -61,12 +63,13 @@ def get_page_price(data_dict):
             val = user_dict[key]
             obj_dict[key] = val
 
-        price_list.append(obj_dict)
+        if len(min_price_buy_list) < 5:
+            min_price_buy_list.append(obj_dict)
 
-        min_price = min(min_price, user_dict['price'])
+        min_price_buy = min(min_price_buy, user_dict['price'])
 
-    data_dict['price_list'] = price_list
-    data_dict['min_price'] = min_price
+    data_dict['min_price_buy_list'] = min_price_buy_list
+    data_dict['min_price_buy'] = min_price_buy
     return SUCC
 
 
@@ -74,7 +77,7 @@ def fail_to_send_msg(data_dict, text_msg):
     ""
     msg = ''
     msg = '%s %s' %(data_dict.get('time_str', 'get time fail'), text_msg)
-    telegram_bot.bot.send_message(chat_id=telegram_bot.my_channel_id, text=msg)
+    telegram_bot.bot.send_message(chat_id=data_dict.get('cur_chat_id', telegram_bot.my_channel_id), text=msg)
 
 
 def gen_time_seq(data_dict):
@@ -102,14 +105,14 @@ def gen_time_seq(data_dict):
 
 def merge_history_price(data_dict):
     ""
-    if not os.path.exists(history_data_path):
-        logging.info('%s not exists.' %(history_data_path))
-        return SUCC
-
     ret = gen_time_seq(data_dict)
     if ret == FAIL:
         logging.fatal('gen time seq fail.')
         return FAIL
+
+    if not os.path.exists(history_data_path):
+        logging.info('%s not exists.' %(history_data_path))
+        return SUCC
 
     need_dates_set = data_dict['dates_set']
     need_hours_set = data_dict['hours_set']
@@ -123,11 +126,11 @@ def merge_history_price(data_dict):
             continue
 
         if 'date' not in json_dict or 'hour' not in json_dict \
-            or 'minute' not in json_dict or 'min_price' not in json_dict:
+            or 'minute' not in json_dict or 'min_price_buy' not in json_dict:
             return FAIL
         tmp_date = json_dict['date']
         tmp_hour = json_dict['hour']
-        tmp_min_price = json_dict['min_price']
+        tmp_min_price = json_dict['min_price_buy']
         if tmp_date in need_dates_set:
             history_data_dict[tmp_date] = min(history_data_dict.get(tmp_date, 100000000000), tmp_min_price)
         date_hour_time = '%s%s' %(tmp_date, tmp_hour)
@@ -146,12 +149,45 @@ def write_data2local(data_dict):
         f.write(util.dict2json(data_dict) + '\n')
 
 
+def send_price_per_hour(data_dict):
+    min_price_buy_list = data_dict.get('min_price_buy_list', [])
+    min_price_buy = data_dict.get('min_price_buy', None)
+    if not min_price_buy_list or not min_price_buy:
+        logging.fatal('get min price fail.')
+    msg = 'now min price %f\n\n' %(min_price_buy)
+    msg += '--------------\n\n'
+
+    msg += 'username price minTradeLimit maxTradeLimit tradeLimit\n'
+    for obj_dict in min_price_buy_list:
+        msg += '%s %s %s %s %s\n' \
+            %(obj_dict['userName'], obj_dict['price'], \
+            obj_dict['minTradeLimit'], obj_dict['maxTradeLimit'], int(obj_dict['tradeCount'] * obj_dict['price']))
+
+    telegram_bot.bot.send_message(chat_id=data_dict.get('cur_chat_id', telegram_bot.my_channel_id), text=msg)
+
+    if min_price_buy < 7.0:
+        great_price_msg = 'great great great price is %f' %(min_price_buy)
+        telegram_bot.bot.send_message(chat_id=data_dict.get('cur_chat_id', telegram_bot.my_channel_id), text=great_price_msg)
+        telegram_bot.bot.send_message(chat_id=data_dict.get('cur_chat_id', telegram_bot.my_channel_id), text=great_price_msg)
+
+
+def send_price_per_day(data_dict):
+    pass
+
+
 def proc_data(data_dict):
     ""
-    price_list = data_dict.get('price_list', [])
-    min_price = data_dict.get('min_price', None)
-    if not price_list or not min_price:
-        return FAIL
+    logging.info('proc data starting...')
+
+    # 每小时发送价格
+    send_price_per_hour(data_dict)
+
+    # 每天8, 20点发送趋势图
+    if data_dict['hour'] == '08' or data_dict['hour'] == '20':
+        send_price_per_day(data_dict)
+    logging.info('proc data end...')
+    return
+
 
 
 def init(data_dict):
@@ -172,9 +208,9 @@ def init(data_dict):
     return
 
 
-def run():
+def run(cur_chat_id):
     ""
-    data_dict = {}
+    data_dict = {'cur_chat_id':cur_chat_id}
     init(data_dict)
     logging.info('Init succ.')
 
@@ -189,24 +225,28 @@ def run():
         time.sleep(1)
 
     if ret == FAIL:
+        logging.fatal('get page price fail.')
         fail_to_send_msg(data_dict, 'get huobi price fail.')
         return
 
     ret = merge_history_price(data_dict)
     if ret == FAIL:
+        logging.fatal('merge history data fail.')
         fail_to_send_msg(data_dict, 'merge history data fail.')
         return
 
     ret = proc_data(data_dict)
     if ret == FAIL:
+        logging.fatal('proc data fail.')
         fail_to_send_msg(data_dict, 'proc data fail.')
         return
 
     write_data2local(data_dict)
+    logging.info('all succ.')
 
 
-def main():
-    run()
+def main(cur_chat_id=telegram_bot.my_channel_id):
+    run(cur_chat_id)
 
 
 if __name__ == '__main__':

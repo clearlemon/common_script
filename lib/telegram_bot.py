@@ -37,10 +37,10 @@ def command(handler,cmd=None,**kw):
 def start(bot, update):
     bot.sendMessage(chat_id=update.message.chat_id, text='I\'am a bot belong with young, please talk to me.')
 
-@command(CommandHandler, 'p')
+@command(CommandHandler, 'price')
 def price(bot, update):
     bot.sendMessage(chat_id=update.message.chat_id, text="Yes i will give you usdt price.")
-    req_huobi.main()
+    req_huobi.main(cur_chat_id=update.message.chat_id)
 
 
 @command(MessageHandler, Filters.text)
@@ -59,4 +59,4 @@ def unknown(bot, update):
     bot.sendMessage(chat_id=update.message.chat_id, text="Sorry, I didn't understand that command.")
 
 
-# updater.start_polling()
+updater.start_polling()

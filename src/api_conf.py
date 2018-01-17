@@ -17,3 +17,9 @@ other_api_dict = {
     'price': 'https://api-otc.huobi.pro/v1/otc/base/market/price',
     'option': 'https://api-otc.huobi.pro/v1/otc/base/select/option',
 }
+
+server_chan_api = {
+    # 'pushbear': 'https://pushbear.ftqq.com/sub?sendkey={sendkey}&text={text}&desp={desp}'
+    'pushbear': 'https://pushbear.ftqq.com/sub',
+    'server_chan': 'https://sc.ftqq.com',
+}

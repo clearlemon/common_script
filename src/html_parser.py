@@ -101,15 +101,14 @@ class otcbtc_parser(SGMLParser):
             elif self.in_price > 0:
                 self.price_info = handle_text(text)
 
-    def fill_data_dict(self, data_dict):
-        data_dict['otcbtc'] = {}
-        data_dict['otcbtc']['danger'] = {
+    def fill_data_dict(self, data_dict, category, action):
+        data_dict['otcbtc'][category][action]['danger'] = {
             'username': self.username_danger,
             'amount_range': self.amount_range_danger,
             'price': self.price_danger,
         }
 
-        data_dict['otcbtc']['info'] = {
+        data_dict['otcbtc'][category][action]['info'] = {
             'username': self.username_info,
             'amount_range': self.amount_range_info,
             'price': self.price_info,

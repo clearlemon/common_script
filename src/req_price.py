@@ -20,7 +20,7 @@ from html_parser import otcbtc_parser
 
 push_obj = pushbear.pushbear_class(bot_token.my_pushbear_key)
 
-attr_name_list = [
+huobi_api_attr_name_list = [
     'userName',
     'price',
     'minTradeLimit',
@@ -71,10 +71,11 @@ def req_page(req_url):
 
 @sleep_decorator
 @retry_decorator
-def get_usdt_price(data_dict, action, key_name):
+def get_huobi_price(data_dict, category, action):
     ""
-    usdt_url = api_conf.usdt_api_dict[action]
-    page_json = req_page(usdt_url)
+    logging.info('Get huobi category: [%s] action: [%s] start.' %(category, action))
+    req_url = api_conf.huobi_api_dict[category][action]
+    page_json = req_page(req_url)
     if not page_json:
         return False
 
@@ -91,7 +92,7 @@ def get_usdt_price(data_dict, action, key_name):
     the_price = -1
     for (idx, user_dict) in enumerate(ret_data_list):
         obj_dict = {}
-        for key in attr_name_list:
+        for key in huobi_api_attr_name_list:
             if key not in user_dict:
                 return False
             val = user_dict[key]
@@ -103,27 +104,29 @@ def get_usdt_price(data_dict, action, key_name):
         if idx == 0:
             the_price = user_dict['price']
 
-    data_dict['price_%s_list' %(action)] = price_list
-    data_dict['%s_price_%s' %(action, key_name)] = the_price
+    data_dict['huobi'][category][action]['price_list'] = price_list
+    data_dict['huobi'][category][action]['the_price'] = the_price
+
+    logging.info('Get huobi category: [%s] action: [%s] end.' %(category, action))
     return True
 
 
 @sleep_decorator
 @retry_decorator
-def get_otcbtc_price(data_dict):
+def get_otcbtc_price(data_dict, category, action):
     ""
-    def extract_info(page_html):
-        usename_pat = re.compile('^[\s\S]*([^/]*)')
 
-    eos_url = 'https://otcbtc.com/sell_offers?currency=eos&fiat_currency=cny&payment_type=all'
-    page_html = req_page(eos_url)
+    logging.info('Get otcbtc category: [%s] action: [%s] start.' %(category, action))
+    req_url = api_conf.otcbtc_api_dict[category][action]
+    page_html = req_page(req_url)
     if not page_html:
         return False
 
     parser_obj = otcbtc_parser()
     parser_obj.feed(page_html)
-    parser_obj.fill_data_dict(data_dict)
+    parser_obj.fill_data_dict(data_dict, category, action)
 
+    logging.info('Get otcbtc category: [%s] action: [%s] end.' %(category, action))
     return True
 
 
@@ -131,19 +134,65 @@ def get_otcbtc_price(data_dict):
 @retry_decorator
 def get_all_price(data_dict):
     ""
-    # price_buy_list, buy_price_min
-    ret = get_usdt_price(data_dict, 'buy', 'min')
-    if not ret:
-        return False
 
-    # price_sell_list, sell_price_max
-    ret = get_usdt_price(data_dict, 'sell', 'max')
-    if not ret:
-        return False
+    """
+        data_dict = {
+            'huobi': {
+                'usdt':{
+                },
+                'btc':{
+                }
+            },
+            'otcbtc':{
+                'eos':{
+                },
+                'btc':{
+                },
+            }
+        }
+    """
 
-    ret = get_otcbtc_price(data_dict)
-    if not ret:
-        return False
+    huobi_attr_list = [
+        ['usdt', 'buy'],
+        ['usdt', 'sell'],
+        ['btc', 'buy'],
+        ['btc', 'sell'],
+    ]
+    platform_name = 'huobi'
+    data_dict[platform_name] = {}
+    for attr_list in huobi_attr_list:
+        category = attr_list[0]
+        action = attr_list[1]
+
+        if category not in data_dict[platform_name]:
+            data_dict[platform_name][category] = {}
+        if action not in data_dict[platform_name][category]:
+            data_dict[platform_name][category][action] = {}
+
+        ret = get_huobi_price(data_dict, category, action)
+        if not ret:
+            return False
+
+    otcbtc_attr_list = [
+        ['eos', 'buy'],
+        ['eos', 'sell'],
+        ['btc', 'buy'],
+        ['btc', 'sell'],
+    ]
+    platform_name = 'otcbtc'
+    data_dict[platform_name] = {}
+    for attr_list in otcbtc_attr_list:
+        category = attr_list[0]
+        action = attr_list[1]
+
+        if category not in data_dict[platform_name]:
+            data_dict[platform_name][category] = {}
+        if action not in data_dict[platform_name][category]:
+            data_dict[platform_name][category][action] = {}
+
+        ret = get_otcbtc_price(data_dict, category, action)
+        if not ret:
+            return False
 
     return True
 
@@ -159,67 +208,122 @@ def check_send_condition(data_dict):
 
     need_send = False
     minute = data_dict['minute']
-    if int(minute) < 8:
+    if int(minute) < 3:
         need_send = True
 
-    usdt_min_buy_price = float(data_dict['buy_price_min'])
-    otcbtc_eos_min_price = float(data_dict['otcbtc']['danger']['price'])
+    huobi_dict = data_dict['huobi']
+    huobi_usdt_dict = huobi_dict['usdt']['buy']
+
+    otcbtc_dict = data_dict['otcbtc']
+    otcbtc_eos_dict = otcbtc_dict['eos']['buy']
+
+    usdt_min_buy_price = float(huobi_usdt_dict['the_price'])
+    otcbtc_eos_min_price = float(otcbtc_eos_dict['danger']['price'])
 
     monitor_usdt_buy_price = api_conf.monitor_price['usdt_buy_price']
     monitor_otcbtc_eos_pirce = api_conf.monitor_price['otcbtc_eos_price']
 
-    if usdt_min_buy_price < monitor_usdt_buy_price:
+    if usdt_min_buy_price <= monitor_usdt_buy_price:
         tmp_desp = 'now_usdt_price: %.2f monitor_price: %.2f' %(usdt_min_buy_price, monitor_usdt_buy_price)
         push_obj.send_msg(text='usdt buy price is very low and buy it now.', desp=tmp_desp)
+        need_send = True
 
-    if otcbtc_eos_min_price < monitor_otcbtc_eos_pirce:
+    if otcbtc_eos_min_price <= monitor_otcbtc_eos_pirce:
         tmp_desp = 'now_eos_price: %.2f monitor_price: %.2f' %(otcbtc_eos_min_price, monitor_otcbtc_eos_pirce)
         push_obj.send_msg(text='otcbtc eos price is very low and buy it now.', desp=tmp_desp)
+        need_send = True
+
     return need_send
+
+
+def gen_huobi_msg(data_dict):
+    ""
+
+    huobi_attr_list = [
+        ['usdt', 'buy'],
+        ['usdt', 'sell'],
+        ['btc', 'buy'],
+        ['btc', 'sell'],
+    ]
+
+    huobi_dict = data_dict['huobi']
+
+    def gen_markdown(category, action, key_name, this_price, this_price_list):
+        this_msg = '* %s_%s_%s_price: %.2f\n\n' \
+                %(category, action, key_name, float(this_price))
+        this_msg += '| username | price | amount_range | tradeLimit |\n'
+        this_msg += '| --- | --- | --- | --- |\n'
+        for obj_dict in this_price_list:
+            trade_limit = int(obj_dict['tradeCount'] * obj_dict['price'])
+            this_msg += '| %s | %s | %s - %s | %s |\n' \
+                %(obj_dict['userName'].encode('utf-8'), obj_dict['price'], \
+                 format(obj_dict['minTradeLimit'], ','), format(obj_dict['maxTradeLimit'], ','), \
+                 format(trade_limit, ','))
+        this_msg += '\n\n'
+        return this_msg
+
+    msg = '### Huobi\n'
+    for attr_list in huobi_attr_list:
+        category = attr_list[0]
+        action = attr_list[1]
+        key_name = ''
+        if action == 'buy':
+            key_name = 'min'
+        elif action == 'sell':
+            key_name = 'max'
+
+        msg += '#### %s' %(category)
+        the_price = huobi_dict[category][action]['the_price']
+        price_list = huobi_dict[category][action]['price_list']
+        msg += gen_markdown(category, action, key_name, the_price, price_list)
+    return msg
+
+
+def gen_otcbtc_msg(data_dict):
+    ""
+
+    otcbtc_attr_list = [
+        ['eos', 'buy'],
+        ['eos', 'sell'],
+        ['btc', 'buy'],
+        ['btc', 'sell'],
+    ]
+
+    otcbtc_dict = data_dict['otcbtc']
+
+    msg = '### OTCBTC\n'
+    msg += '| brief | username | amount_range | price |\n'
+    msg += '| --- | --- | --- | --- |\n'
+    for attr_list in otcbtc_attr_list:
+        category = attr_list[0]
+        action = attr_list[1]
+        key_name = ''
+        if action == 'buy':
+            key_name == 'min'
+        elif action == 'sell':
+            key_name == 'max'
+        msg += '#### %s' %(category)
+        brief = '%s_%s_price' %(category, action)
+        username = otcbtc_dict[category][action]['danger']['username']
+        amount_range = otcbtc_dict[category][action]['danger']['amount_range']
+        price = otcbtc_dict[category][action]['danger']['price']
+        msg += '| %s | %s | %s | %s |\n' \
+                %(brief, username, amount_range, price)
+    return msg
+
 
 def send_price(data_dict):
     ""
-    usdt_min_buy_price = data_dict['buy_price_min']
-    usdt_buy_price_list = data_dict['price_buy_list']
+    msg = ''
+    msg += gen_huobi_msg(data_dict)
 
-    usdt_max_sell_price = data_dict['sell_price_max']
-    usdt_sell_price_list = data_dict['price_sell_list']
+    msg += '\n\n'
+
+    msg += gen_otcbtc_msg(data_dict)
 
     time_str = data_dict['time_str']
-
-    msg = ''
-
-    msg + '#### Huobi'
-    msg += '* usdt_buy_min_price: %.2f\n\n' %(usdt_min_buy_price)
-    msg += '| username | price | amount_range | tradeLimit |\n'
-    msg += '| --- | --- | --- | --- |\n'
-    for obj_dict in usdt_buy_price_list:
-        trade_limit = int(obj_dict['tradeCount'] * obj_dict['price'])
-        msg += '| %s | %s | %s - %s | %s |\n' \
-                %(obj_dict['userName'].encode('utf-8'), obj_dict['price'], \
-                 format(obj_dict['minTradeLimit'], ','), format(obj_dict['maxTradeLimit'], ','), \
-                 format(trade_limit, ','))
-
-    msg += '\n\n'
-    msg += '* usdt_sell_max_price: %.2f\n\n' %(usdt_max_sell_price)
-    msg += '| username | price | amount_range | tradeLimit |\n'
-    msg += '| --- | --- | --- | --- |\n'
-    for obj_dict in usdt_sell_price_list:
-        trade_limit = int(obj_dict['tradeCount'] * obj_dict['price'])
-        msg += '| %s | %s | %s - %s | %s |\n' \
-                %(obj_dict['userName'].encode('utf-8'), obj_dict['price'], \
-                 format(obj_dict['minTradeLimit'], ','), format(obj_dict['maxTradeLimit'], ','), \
-                 format(trade_limit, ','))
-
-    msg += '\n\n'
-    msg += '#### OTCBTC\n'
-    msg += '| brief | username | amount_range | price |\n'
-    msg += '| --- | --- | --- | --- |\n'
-    msg += '| %s | %s | %s | %s |\n' \
-            %('eos_min_pirce', data_dict['otcbtc']['danger']['username'], \
-                data_dict['otcbtc']['danger']['amount_range'], data_dict['otcbtc']['danger']['price'])
-
-    if check_send_condition(data_dict):
+    if check_send_condition(data_dict) or True:
+        print msg
         ret = push_obj.send_msg(text=time_str, desp=msg)
         if not ret:
             return False
@@ -242,6 +346,8 @@ def proc_data(data_dict):
 def init(data_dict):
     ""
     time_obj = util.DateHour()
+    # 时区
+    time_obj.shift(hours=13)
     date, hour, minute = time_obj.get_date_hour()
     time_str = '%s-%s-%s' %(date, hour, minute)
     data_dict['date'] = date

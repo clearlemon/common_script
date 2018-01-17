@@ -23,3 +23,8 @@ server_chan_api = {
     'pushbear': 'https://pushbear.ftqq.com/sub',
     'server_chan': 'https://sc.ftqq.com',
 }
+
+monitor_price = {
+    'usdt_buy_price': 7.1,
+    'otcbtc_eos_price': 65,
+}

@@ -4,6 +4,7 @@
 import logging
 import os
 import random
+import re
 import sys
 import time
 import urllib
@@ -15,6 +16,7 @@ import util
 import api_conf
 import pushbear
 import bot_token
+from html_parser import otcbtc_parser
 
 push_obj = pushbear.pushbear_class(bot_token.my_pushbear_key)
 
@@ -30,7 +32,7 @@ history_data_path = '../data/history_data'
 def sleep_decorator(func):
     def wrapper(*args, **kw):
         logging.info('[slepp_decorator] %s start.' %(func.__name__))
-        time.sleep(random.choice([0.1, 0.3, 0.7, 1]))
+        time.sleep(random.choice([0.2, 0.5, 0.7, 1, 1.8]))
         ret = func(*args, **kw)
         logging.info('[slepp_decorator] %s end.' %(func.__name__))
         return ret
@@ -95,7 +97,7 @@ def get_usdt_price(data_dict, action, key_name):
             val = user_dict[key]
             obj_dict[key] = val
 
-        if len(price_list) < 5:
+        if len(price_list) < 8:
             price_list.append(obj_dict)
 
         if idx == 0:
@@ -105,9 +107,24 @@ def get_usdt_price(data_dict, action, key_name):
     data_dict['%s_price_%s' %(action, key_name)] = the_price
     return True
 
+
+@sleep_decorator
+@retry_decorator
 def get_otcbtc_price(data_dict):
     ""
+    def extract_info(page_html):
+        usename_pat = re.compile('^[\s\S]*([^/]*)')
+
     eos_url = 'https://otcbtc.com/sell_offers?currency=eos&fiat_currency=cny&payment_type=all'
+    page_html = req_page(eos_url)
+    if not page_html:
+        return False
+
+    parser_obj = otcbtc_parser()
+    parser_obj.feed(page_html)
+    parser_obj.fill_data_dict(data_dict)
+
+    return True
 
 
 @sleep_decorator
@@ -124,18 +141,43 @@ def get_all_price(data_dict):
     if not ret:
         return False
 
+    ret = get_otcbtc_price(data_dict)
+    if not ret:
+        return False
+
     return True
 
 
 def write_data2local(data_dict):
     ""
-    print data_dict
     del data_dict['time_obj']
     with open(history_data_path, 'a') as f:
         f.write(util.dict2json(data_dict) + '\n')
 
 
-def send_price_per_hour(data_dict):
+def check_send_condition(data_dict):
+
+    need_send = False
+    minute = data_dict['minute']
+    if int(minute) < 8:
+        need_send = True
+
+    usdt_min_buy_price = float(data_dict['buy_price_min'])
+    otcbtc_eos_min_price = float(data_dict['otcbtc']['danger']['price'])
+
+    monitor_usdt_buy_price = api_conf.monitor_price['usdt_buy_price']
+    monitor_otcbtc_eos_pirce = api_conf.monitor_price['otcbtc_eos_price']
+
+    if usdt_min_buy_price < monitor_usdt_buy_price:
+        tmp_desp = 'now_usdt_price: %.2f monitor_price: %.2f' %(usdt_min_buy_price, monitor_usdt_buy_price)
+        push_obj.send_msg(text='usdt buy price is very low and buy it now.', desp=tmp_desp)
+
+    if otcbtc_eos_min_price < monitor_otcbtc_eos_pirce:
+        tmp_desp = 'now_eos_price: %.2f monitor_price: %.2f' %(otcbtc_eos_min_price, monitor_otcbtc_eos_pirce)
+        push_obj.send_msg(text='otcbtc eos price is very low and buy it now.', desp=tmp_desp)
+    return need_send
+
+def send_price(data_dict):
     ""
     usdt_min_buy_price = data_dict['buy_price_min']
     usdt_buy_price_list = data_dict['price_buy_list']
@@ -145,30 +187,42 @@ def send_price_per_hour(data_dict):
 
     time_str = data_dict['time_str']
 
-    msg = '* usdt_buy_min_price: %.2f\n\n' %(usdt_min_buy_price)
-    msg += '| username | price | minLimit | maxLimit | tradeLimit |\n'
-    msg += '| --- | --- | --- | --- | --- |\n'
+    msg = ''
+
+    msg + '#### Huobi'
+    msg += '* usdt_buy_min_price: %.2f\n\n' %(usdt_min_buy_price)
+    msg += '| username | price | amount_range | tradeLimit |\n'
+    msg += '| --- | --- | --- | --- |\n'
     for obj_dict in usdt_buy_price_list:
         trade_limit = int(obj_dict['tradeCount'] * obj_dict['price'])
-        msg += '| %s | %s | %s | %s | %s |\n' \
+        msg += '| %s | %s | %s - %s | %s |\n' \
                 %(obj_dict['userName'].encode('utf-8'), obj_dict['price'], \
                  format(obj_dict['minTradeLimit'], ','), format(obj_dict['maxTradeLimit'], ','), \
                  format(trade_limit, ','))
 
     msg += '\n\n'
     msg += '* usdt_sell_max_price: %.2f\n\n' %(usdt_max_sell_price)
-    msg += '| username | price | minLimit | maxLimit | tradeLimit |\n'
-    msg += '| --- | --- | --- | --- | --- |\n'
+    msg += '| username | price | amount_range | tradeLimit |\n'
+    msg += '| --- | --- | --- | --- |\n'
     for obj_dict in usdt_sell_price_list:
         trade_limit = int(obj_dict['tradeCount'] * obj_dict['price'])
-        msg += '| %s | %s | %s | %s | %s |\n' \
+        msg += '| %s | %s | %s - %s | %s |\n' \
                 %(obj_dict['userName'].encode('utf-8'), obj_dict['price'], \
                  format(obj_dict['minTradeLimit'], ','), format(obj_dict['maxTradeLimit'], ','), \
                  format(trade_limit, ','))
 
-    ret = push_obj.send_msg(text=time_str, desp=msg)
-    if not ret:
-        return False
+    msg += '\n\n'
+    msg += '#### OTCBTC\n'
+    msg += '| brief | username | amount_range | price |\n'
+    msg += '| --- | --- | --- | --- |\n'
+    msg += '| %s | %s | %s | %s |\n' \
+            %('eos_min_pirce', data_dict['otcbtc']['danger']['username'], \
+                data_dict['otcbtc']['danger']['amount_range'], data_dict['otcbtc']['danger']['price'])
+
+    if check_send_condition(data_dict):
+        ret = push_obj.send_msg(text=time_str, desp=msg)
+        if not ret:
+            return False
 
     return True
 
@@ -177,8 +231,8 @@ def proc_data(data_dict):
     ""
     logging.info('proc data starting...')
 
-    # 每小时发送价格
-    ret = send_price_per_hour(data_dict)
+    # send price info
+    ret = send_price(data_dict)
     if not ret:
         return False
 

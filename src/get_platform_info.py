@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+import functools
 import logging
 import os
 import random
@@ -17,6 +18,7 @@ import html_parser
 
 
 def sleep_decorator(func):
+    @functools.wraps(func)
     def wrapper(*args, **kw):
         logging.info('[slepp_decorator] %s start.' %(func.__name__))
         time.sleep(random.choice([0.2, 0.5, 0.7, 1, 1.8]))
@@ -27,6 +29,7 @@ def sleep_decorator(func):
 
 
 def retry_decorator(func):
+    @functools.wraps(func)
     def wrapper(*args, **kw):
         logging.info('[retry_decorator] %s start.' %(func.__name__))
         retry_cnt = 5
@@ -64,7 +67,7 @@ class huobi(object):
     def get_price(data_dict, category, action):
         ""
         logging.info('Get huobi category: [%s] action: [%s] start.' %(category, action))
-        req_url = api_conf.huobi_api_dict[category][action]
+        req_url = api_conf.platform_api_dict['huobi'][category][action]
         page_json = req_page(req_url)
         if not page_json:
             return False
@@ -96,7 +99,7 @@ class huobi(object):
                 val = user_dict[key]
                 obj_dict[key] = val
 
-            if len(price_list) < 8:
+            if len(price_list) < 3:
                 price_list.append(obj_dict)
 
             if idx == 0:
@@ -158,7 +161,7 @@ class otcbtc(object):
         ""
 
         logging.info('Get otcbtc category: [%s] action: [%s] start.' %(category, action))
-        req_url = api_conf.otcbtc_api_dict[category][action]
+        req_url = api_conf.platform_api_dict['otcbtc'][category][action]
         page_html = req_page(req_url)
         if not page_html:
             return False

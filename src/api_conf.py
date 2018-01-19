@@ -3,44 +3,6 @@
 
 import get_platform_info
 
-usdt_api_dict = {
-    'buy': 'https://api-otc.huobi.pro/v1/otc/trade/list/public?coinId=2&tradeType=1&currentPage=1&payWay=&country=&merchant=0&online=1&range=0',
-    'sell': 'https://api-otc.huobi.pro/v1/otc/trade/list/public?coinId=2&tradeType=0&currentPage=1&payWay=&country=&merchant=0&online=1&range=0',
-}
-
-
-btc_api_dict = {
-    'buy': 'https://api-otc.huobi.pro/v1/otc/trade/list/public?coinId=1&tradeType=1&currentPage=1&payWay=&country=&merchant=0&online=1&range=0',
-    'sell': 'https://api-otc.huobi.pro/v1/otc/trade/list/public?coinId=1&tradeType=0&currentPage=1&payWay=&country=&merchant=0&online=1&range=0',
-}
-
-
-other_api_dict = {
-    'price': 'https://api-otc.huobi.pro/v1/otc/base/market/price',
-    'option': 'https://api-otc.huobi.pro/v1/otc/base/select/option',
-}
-
-huobi_api_dict = {
-    'usdt': {
-        'buy': 'https://api-otc.huobi.pro/v1/otc/trade/list/public?coinId=2&tradeType=1&currentPage=1&payWay=&country=&merchant=0&online=1&range=0',
-        'sell': 'https://api-otc.huobi.pro/v1/otc/trade/list/public?coinId=2&tradeType=0&currentPage=1&payWay=&country=&merchant=0&online=1&range=0',
-    },
-    'btc': {
-        'buy': 'https://api-otc.huobi.pro/v1/otc/trade/list/public?coinId=1&tradeType=1&currentPage=1&payWay=&country=&merchant=0&online=1&range=0',
-        'sell': 'https://api-otc.huobi.pro/v1/otc/trade/list/public?coinId=1&tradeType=0&currentPage=1&payWay=&country=&merchant=0&online=1&range=0',
-    }
-}
-
-otcbtc_api_dict = {
-    'eos': {
-        'buy':'https://otcbtc.com/sell_offers?currency=eos&fiat_currency=cny&payment_type=all',
-        'sell':'https://otcbtc.com/buy_offers?currency=eos&fiat_currency=cny&payment_type=all',
-    },
-    'btc': {
-        'buy':'https://otcbtc.com/sell_offers?currency=btc&fiat_currency=cny&payment_type=all',
-        'sell':'https://otcbtc.com/buy_offers?currency=btc&fiat_currency=cny&payment_type=all',
-    },
-}
 
 platform_api_dict = {
     'huobi':{

@@ -108,7 +108,7 @@ def send_price(data_dict):
         msg += '\n\n'
 
     time_str = data_dict['time_str']
-    if check_send_condition(data_dict):
+    if check_send_condition(data_dict) or data_dict.get('telegram_run', False):
         ret = push_obj.send_msg(text=time_str, desp=msg)
         if not ret:
             return False
@@ -174,6 +174,13 @@ def run(data_dict):
 
 def main():
     data_dict = {}
+    ret = run(data_dict)
+    if not ret:
+        time_str = data_dict['time_str']
+        push_obj.send_msg(time_str, 'Get price fail.')
+
+def telegram_run():
+    data_dict = {'telegram_run':True}
     ret = run(data_dict)
     if not ret:
         time_str = data_dict['time_str']

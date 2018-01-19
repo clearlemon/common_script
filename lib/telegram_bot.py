@@ -14,7 +14,7 @@ import bot_func
 from bot_token import *
 
 sys.path.append('../src')
-import req_huobi
+import req_price
 
 
 bot = telegram.Bot(token=my_token)
@@ -39,8 +39,8 @@ def start(bot, update):
 
 @command(CommandHandler, 'price')
 def price(bot, update):
-    bot.sendMessage(chat_id=update.message.chat_id, text="Yes i will give you usdt price.")
-    req_huobi.main(cur_chat_id=update.message.chat_id)
+    bot.sendMessage(chat_id=update.message.chat_id, text="Yes i will give you all price.")
+    req_price.telegram_run()
 
 
 @command(MessageHandler, Filters.text)
@@ -60,3 +60,4 @@ def unknown(bot, update):
 
 
 updater.start_polling()
+updater.idle()

@@ -61,6 +61,12 @@ def get_all_price(data_dict):
             if not ret:
                 return False
 
+        run_list = platform_val.get('run_list', [])
+        for run_func in run_list:
+            ret = run_func(data_dict)
+            if not ret:
+                return False
+
     return True
 
 
@@ -100,7 +106,18 @@ def check_send_condition(data_dict):
 
 def send_price(data_dict):
     ""
-    msg = ''
+
+    huobi_usdt_cny_price = data_dict['huobi']['usdt']['buy']['the_price']
+    huobi_market_xrpusdt = data_dict['huobi']['market_coin']['xrpusdt']
+    huobi_market_usdt = data_dict['huobi']['market_coin']['USDT']
+    huobi_market_xrpcny = huobi_market_xrpusdt * huobi_market_usdt
+
+    otcbtc_eos_cny_price = data_dict['otcbtc']['eos']['buy']['danger']['price']
+
+    msg = 'usdt:%s...eos:%s...xrp:%.4f' \
+            %(huobi_usdt_cny_price, \
+                otcbtc_eos_cny_price, \
+                huobi_market_xrpcny)
 
     for platform_name, platform_val in api_conf.platform_api_dict.items():
         tool_obj = api_conf.platform_api_dict[platform_name]['tool_obj']

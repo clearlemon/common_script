@@ -32,13 +32,14 @@ def retry_decorator(func):
     @functools.wraps(func)
     def wrapper(*args, **kw):
         logging.info('[retry_decorator] %s start.' %(func.__name__))
-        retry_cnt = 5
+        retry_cnt = api_conf.common_conf['retry_cnt']
         ret = False
         while retry_cnt > 0:
             try:
                 ret = func(*args, **kw)
             except Exception, e:
-                logging.warning('Exception_type: [%s] Exception: %s' %(type(e), e))
+                logging.warning('retry_decorator [%s] Exception_type: [%s] Exception: %s' \
+                                    %(func.__name__, type(e), e))
             if ret:
                 logging.info('[retry_decorator] %s end.' %(func.__name__))
                 return True
@@ -77,7 +78,7 @@ class huobi(object):
         if ret_code != 200:
             return False
 
-        ret_data_list = page_dict.get('data', {})
+        ret_data_list = page_dict.get('data', [])
         if not ret_data_list:
             return False
 
@@ -99,7 +100,7 @@ class huobi(object):
                 val = user_dict[key]
                 obj_dict[key] = val
 
-            if len(price_list) < 3:
+            if len(price_list) < api_conf.common_conf['price_list_range']:
                 price_list.append(obj_dict)
 
             if idx == 0:
@@ -109,6 +110,74 @@ class huobi(object):
         data_dict['huobi'][category][action]['the_price'] = the_price
 
         logging.info('Get huobi category: [%s] action: [%s] end.' %(category, action))
+        return True
+
+
+    @staticmethod
+    def coin2cny(data_dict):
+        ""
+        logging.info('Get huobi coin2cny start.')
+        huobi_cny_api = api_conf.platform_api_dict['huobi']['huobi_cny_api']
+
+        page_json = req_page(huobi_cny_api)
+        if not page_json:
+            return False
+
+        page_dict = util.json2dict(page_json)
+        ret_code = page_dict.get('code', -1)
+        if ret_code != 200:
+            return False
+
+        ret_data_list = page_dict.get('data', [])
+        if not ret_data_list:
+            return False
+
+        for coin_dict in ret_data_list:
+            coin_name = coin_dict['coinName']
+            cny_price = coin_dict['price']
+
+            if 'market_coin' not in data_dict['huobi']:
+                data_dict['huobi']['market_coin'] = {}
+
+            data_dict['huobi']['market_coin'][coin_name] = float(cny_price)
+
+        logging.info('Get huobi coin2cny end.')
+        return True
+
+
+    @staticmethod
+    @sleep_decorator
+    @retry_decorator
+    def get_market_price(data_dict):
+        ""
+        logging.info('Get huobi market price start.')
+        ret = huobi.coin2cny(data_dict)
+
+        if not ret:
+            return False
+
+        for market_coin_name in api_conf.platform_api_dict['huobi']['market_coin_list']:
+            
+            logging.info('Get huobi %s start.' %(market_coin_name))
+            market_coin_api = api_conf.platform_api_dict['huobi']['market_coin_api'][market_coin_name]
+
+            page_json = req_page(market_coin_api)
+            if not page_json:
+                return False
+
+            page_dict = util.json2dict(page_json)
+            ret_code = page_dict.get('status', None)
+            if ret_code != 'ok':
+                return False
+
+            ret_data_list = page_dict.get('data', [])
+            if not ret_data_list:
+                return False
+
+            the_price = float(ret_data_list[0]['close'])
+            data_dict['huobi']['market_coin'][market_coin_name] = the_price
+            logging.info('Get huobi %s end.' %(market_coin_name))
+        logging.info('Get huobi market price end.')
         return True
 
 
@@ -135,6 +204,16 @@ class huobi(object):
             return this_msg
 
         msg = '\n\n### Huobi\n\n'
+        msg += '| brief | price |\n'
+        msg += '| --- | --- |\n'
+        for market_coin_name in api_conf.platform_api_dict['huobi']['market_coin_list']:
+            msg += '| %s | %s |\n' \
+                %(market_coin_name, data_dict['huobi']['market_coin'][market_coin_name])
+
+        for market_coin_name in api_conf.platform_api_dict['huobi']['market_price_coin_list']:
+            msg += '| %s/CNY | %s |\n' \
+                %(market_coin_name, data_dict['huobi']['market_coin'][market_coin_name])
+
         for attr_list in huobi_attr_list:
             category = attr_list[0]
             action = attr_list[1]
@@ -144,10 +223,11 @@ class huobi(object):
             elif action == 'sell':
                 key_name = 'max'
 
-            msg += '\n\n#### %s\n\n' %(category)
+            # msg += '\n\n#### %s\n\n' %(category)
             the_price = huobi_dict[category][action]['the_price']
             price_list = huobi_dict[category][action]['price_list']
             msg += gen_markdown(category, action, key_name, the_price, price_list)
+
         return msg
 
 

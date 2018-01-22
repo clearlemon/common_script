@@ -74,7 +74,7 @@ def check_send_condition(data_dict):
 
     need_send = False
     minute = data_dict['minute']
-    if int(minute) < 3:
+    if int(minute) < 4:
         need_send = True
 
     huobi_dict = data_dict['huobi']
@@ -108,7 +108,7 @@ def send_price(data_dict):
     ""
 
     huobi_usdt_cny_price = data_dict['huobi']['usdt']['buy']['the_price']
-    huobi_market_xrpusdt = data_dict['huobi']['market_coin']['xrpusdt']
+    huobi_market_xrpusdt = data_dict['huobi']['market_coin']['xrp/usdt']
     huobi_market_usdt = data_dict['huobi']['market_coin']['USDT']
     huobi_market_xrpcny = huobi_market_xrpusdt * huobi_market_usdt
 

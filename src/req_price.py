@@ -140,8 +140,10 @@ def proc_data(data_dict):
     # send price info
     ret = send_price(data_dict)
     if not ret:
+        logging.warning('send price fail...')
         return False
 
+    logging.info('proc data succ...')
     return True
 
 

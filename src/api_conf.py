@@ -27,10 +27,12 @@ platform_api_dict = {
             ['eth', 'sell'],
         ],
         'market_coin_api': {
-            'xrpusdt': 'https://api.huobi.pro/market/history/kline?period=1min&size=10&symbol=xrpusdt',
+            'xrp/usdt': 'https://api.huobi.pro/market/history/kline?period=1min&size=10&symbol=xrpusdt',
+            'eos/usdt': 'https://api.huobi.pro/market/history/kline?period=1min&size=10&symbol=eosusdt',
         },
         'market_coin_list': [
-            'xrpusdt',
+            'xrp/usdt',
+            'eos/usdt',
         ],
         'huobi_cny_api':'https://api-otc.huobi.pro/v1/otc/base/market/price',
         'market_price_coin_list': [
@@ -81,6 +83,6 @@ server_chan_api = {
 }
 
 monitor_price = {
-    'usdt_buy_price': 7.1,
+    'usdt_buy_price': 7.05,
     'otcbtc_eos_price': 65,
 }
